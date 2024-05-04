@@ -1,5 +1,7 @@
 package com.hf.groups.feign;
 
+import java.util.List;
+
 import org.springframework.cloud.openfeign.FeignClient;
 
 import org.springframework.web.bind.annotation.GetMapping;
@@ -16,5 +18,6 @@ public interface UserFeignClient {
     @GetMapping(value="api/users/getcoachidinfo/{userId}",produces = "application/json")
     Long getCoachid(@PathVariable Long userId);
 
-   
+    @GetMapping("/api/users/usernames")
+    List<String> getUsernamesByIds(@PathVariable List<Long> userIds);
 }

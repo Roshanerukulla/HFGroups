@@ -1,5 +1,6 @@
 package com.hf.groups.service;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
@@ -7,10 +8,12 @@ import java.util.Optional;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import com.hf.groups.entity.FriendDetailsDTO;
 import com.hf.groups.entity.Groups;
 import com.hf.groups.entity.UserResponse;
 import com.hf.groups.exception.GroupNotFoundException;
 import com.hf.groups.exception.UserNotFoundException;
+import com.hf.groups.feign.ActivityFeignClient;
 import com.hf.groups.feign.UserFeignClient;
 import com.hf.groups.repository.GroupsRepository;
 
@@ -21,10 +24,11 @@ public class GroupService {
     private GroupsRepository groupRepository;
 
     @Autowired
-    private UserFeignClient userFeignClient; // Assuming you have a Feign client to fetch user details
+    private UserFeignClient userFeignClient;
+    @Autowired
+    private ActivityFeignClient activityFeignClient;
 
     public Groups createGroupAutomatically(Long userId) {
-        // Fetch user information to get the associated coach ID
         UserResponse user = userFeignClient.getUser(userId);
         if (user == null) {
             throw new UserNotFoundException("User not found with id: " + userId);
@@ -32,60 +36,60 @@ public class GroupService {
 
         Long coachId = user.getCoachId();
 
-        // Check if a group with the same coach ID exists
         Groups existingGroup = groupRepository.findByCoachIdAndGroupName(coachId, "Group " + coachId).orElse(null);
         if (existingGroup != null) {
-            // If a group exists, add the user to the existing group
             return addUserToGroup(existingGroup.getGroupId(), userId);
         }
 
-        // If no group exists, create a new group and add the user to it
         Groups group = new Groups();
         group.setCoachId(coachId);
         group.setGroupName("Group " + coachId);
-        group.setUsers(Collections.singletonList(userId)); // Add the user to the group
+        group.setUsers(Collections.singletonList(userId));
 
         return groupRepository.save(group);
     }
-    public Groups addUserAutomatically(Long userId) {
-        // Fetch user information to get the associated coach ID
-        UserResponse user = userFeignClient.getUser(userId);
-        if (user == null) {
-            throw new UserNotFoundException("User not found with id: " + userId);
-        }
 
-        Long coachId = userFeignClient.getCoachid(userId);
-
-
-        // Check if a group with the same coach ID exists
-        Groups existingGroup = groupRepository.findByCoachIdAndGroupName(coachId, "Group " + coachId).orElse(null);
-        if (existingGroup != null) {
-            // If a group exists, add the user to the existing group
-            return addUserToGroup(existingGroup.getGroupId(), userId);
-        }
-
-        // If no group exists, create a new group and add the user to it
-        Groups group = new Groups();
-        group.setCoachId(coachId);
-        group.setGroupName("Group " + coachId);
-        group.setUsers(Collections.singletonList(userId)); // Add the user to the group
-
-        return groupRepository.save(group);
-    }
-    public List<Long> getFriendsUserIds(Long userId) {
-        // Fetch friends' user IDs based on the user's group
+    public List<FriendDetailsDTO> getFriendsInfo(Long userId) {
+        // Fetch the group information for the given user
         Groups group = groupRepository.findByUsersContaining(userId)
-                .orElseThrow(() -> new UserNotFoundException("User not found in any group with id: " + userId));
+                .orElseThrow(() -> new GroupNotFoundException("User not found in any group with id: " + userId));
 
-        // Return a list of user IDs excluding the given user's ID
-        return group.getUsers().stream().filter(id -> !id.equals(userId)).toList();
+        // Fetch information about the users in the group
+        List<Long> userIds = group.getUsers();
+        List<FriendDetailsDTO>friendsInfo = new ArrayList<>();
+
+        // Fetch information about each user using Feign clients
+        for (Long friendId : userIds) {
+            // Fetch user information
+            UserResponse user = userFeignClient.getUser(friendId);
+            if (user == null) {
+                throw new UserNotFoundException("User not found with id: " + friendId);
+            }
+
+            // Fetch total steps walked by the user
+            Long totalSteps = activityFeignClient.getTotalSteps(friendId);
+
+            // Create FriendDetailsDto object and add it to the list
+            FriendDetailsDTO friendDetailsDto = new FriendDetailsDTO();
+            friendDetailsDto.setUserId(friendId);
+            friendDetailsDto.setUsername(user.getUsername());
+            friendDetailsDto.setTotalSteps(totalSteps);
+            friendsInfo.add(friendDetailsDto);
+        }
+
+        return friendsInfo;
     }
 
-  
+    public List<Long> getTotalSteps(List<Long> userIds) {
+        return userIds.stream()
+                .map(activityFeignClient::getTotalSteps)
+                .toList();
+    }
 
     public Optional<Groups> getGroupById(Long groupId) {
         return groupRepository.findById(groupId);
     }
+
     public Groups addUserToGroup(Long groupId, Long userId) {
         Groups group = groupRepository.findById(groupId)
                 .orElseThrow(() -> new GroupNotFoundException("Group not found with id: " + groupId));
@@ -97,5 +101,4 @@ public class GroupService {
 
         return group;
     }
-    // Other methods for group-related operations
 }

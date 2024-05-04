@@ -1,15 +1,14 @@
 package com.hf.groups.entity;
 
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
 
 public class UserResponse {
 
     private Long userId;
-
+    private String username; // Add the username field
     private Long coachId;
 
-    // other fields and getters and setters
+    // Constructors, getters, and setters
 
     public Long getUserId() {
         return userId;
@@ -17,6 +16,14 @@ public class UserResponse {
 
     public void setUserId(Long userId) {
         this.userId = userId;
+    }
+
+    public String getUsername() {
+        return username;
+    }
+
+    public void setUsername(String username) {
+        this.username = username;
     }
 
     public Long getCoachId() {

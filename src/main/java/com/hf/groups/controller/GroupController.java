@@ -13,12 +13,12 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.hf.groups.entity.FriendDetailsDTO;
 import com.hf.groups.entity.Groups;
 import com.hf.groups.entity.UserResponse;
 import com.hf.groups.exception.GroupAlreadyExistException;
 import com.hf.groups.exception.GroupNotFoundException;
 import com.hf.groups.exception.UserNotFoundException;
-import com.hf.groups.feign.UserFeignClient;
 import com.hf.groups.service.GroupService;
 
 @RestController
@@ -28,19 +28,9 @@ public class GroupController {
     @Autowired
     private GroupService groupService;
 
-    @Autowired
-    private UserFeignClient userFeignClient;
-
-    @PostMapping("/create-auto")
-    public ResponseEntity<Groups> createGroupAutomatically(@RequestParam Long userId) {
+    @PostMapping("/{userId}/add-to-group")
+    public ResponseEntity<Groups> createGroupAutomatically(@PathVariable Long userId) {
         try {
-            // Fetch user information to get the associated coach ID
-            UserResponse user = userFeignClient.getUser(userId);
-            if (user == null) {
-                throw new UserNotFoundException("User not found with id: " + userId);
-            }
-
-            // Use the coach ID to create or retrieve the group
             Groups createdGroup = groupService.createGroupAutomatically(userId);
             return new ResponseEntity<>(createdGroup, HttpStatus.CREATED);
         } catch (UserNotFoundException | GroupAlreadyExistException e) {
@@ -48,35 +38,25 @@ public class GroupController {
         }
     }
 
-    @PostMapping("/{groupId}/add-user")
-    public ResponseEntity<Groups> addUserToGroup(@PathVariable Long groupId, @RequestParam Long userId) {
+    @GetMapping("/{userId}/friendsinfo")
+    public ResponseEntity<List<FriendDetailsDTO>> getFriendsInfo(@PathVariable Long userId) {
         try {
-            Groups updatedGroup = groupService.addUserToGroup(groupId, userId);
-            return new ResponseEntity<>(updatedGroup, HttpStatus.OK);
-        } catch (GroupNotFoundException e) {
+            List<FriendDetailsDTO> friendsInfo = groupService.getFriendsInfo(userId);
+            return new ResponseEntity<>(friendsInfo, HttpStatus.OK);
+        } catch (UserNotFoundException e) {
             return new ResponseEntity<>(HttpStatus.NOT_FOUND);
         }
     }
-    @PostMapping("/add-user-auto")
-    public ResponseEntity<Groups> addUserAutomatically(@RequestParam Long userId) {
-        try {
-            Groups updatedGroup = groupService.addUserAutomatically(userId);
-            return new ResponseEntity<>(updatedGroup, HttpStatus.OK);
-        } catch (UserNotFoundException | GroupNotFoundException e) {
-            return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
-        }
-    }
-    @GetMapping("/friends/{userId}")
-    public ResponseEntity<List<Long>> getFriendsUserIds(@PathVariable Long userId) {
-        List<Long> friendsUserIds = groupService.getFriendsUserIds(userId);
-        return ResponseEntity.ok(friendsUserIds);
-    }
 
+//    @GetMapping("/friends/{userId}")
+//    public ResponseEntity<List<Long>> getFriendsUserIds(@PathVariable Long userId) {
+//        List<Long> friendsUserIds = groupService.getFriendsUserIds(userId);
+//        return ResponseEntity.ok(friendsUserIds);
+//    }
 
 
     // Other endpoints for group-related operations
 
-    // Example endpoint to get group information by ID
     @GetMapping("/{groupId}")
     public ResponseEntity<Groups> getGroupById(@PathVariable Long groupId) {
         Optional<Groups> group = groupService.getGroupById(groupId);
